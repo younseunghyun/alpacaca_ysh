@@ -1,16 +1,16 @@
 import time
 import math
-import pickle 
+import pickle
 from tqdm import tqdm
 
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
 
-class LetterTrainer():
 
+class LetterTrainer():
     def __init__(self, model, data_reader, criterion=nn.NLLLoss(), learning_rate=0.0005,
-                n_iters=100000, print_every=5000, plot_every=500):
+                 n_iters=100000, print_every=5000, plot_every=500):
 
         self.rnn = model
         self.data_reader = data_reader
@@ -43,7 +43,7 @@ class LetterTrainer():
     def run(self):
 
         self.all_losses = []
-        self.total_loss = 0 # Reset every plot_every iters
+        self.total_loss = 0  # Reset every plot_every iters
 
         start = time.time()
 
@@ -53,7 +53,7 @@ class LetterTrainer():
 
             if i % self.print_every == 0:
                 print('%s (%d %d%%) %.4f' % (self.timeSince(start), i, i / self.n_iters * 100, loss))
-                
+
             if i % self.plot_every == 0:
                 self.all_losses.append(self.total_loss / self.plot_every)
                 self.total_loss = 0
@@ -68,11 +68,13 @@ class LetterTrainer():
         s -= m * 60
         return '%dm %ds' % (m, s)
 
+
 class DataLoaderTrainer():
-
-    def __init__(self, model, dataloader, optimizer, scheduler, criterion=nn.MSELoss(), 
-                print_every=1, plot_every=1):
-
+    def __init__(self, model, dataloader, optimizer, scheduler, criterion=nn.MSELoss(),
+                 print_every=1, plot_every=1):
+        self.inputs, self.targets = None, None
+        self.sentence_out = None
+        self.avg_loss = None
         self.rnn = model
         self.dataloader = dataloader
         self.optimizer = optimizer
@@ -83,39 +85,43 @@ class DataLoaderTrainer():
         self.i = 0
         self.all_losses = []
 
-    def train(self):
+    def train(self, noTqdm=False):
 
         self.losses = []
-        for inputs, targets in tqdm(self.dataloader):
-
-            self.inputs, self.targets = inputs, targets
-
-            self.optimizer.zero_grad()
-            self.rnn.hidden = self.rnn.init_hidden()
-
-            self.sentence_out = self.rnn(inputs)
-            loss = self.criterion(self.sentence_out, self.targets)
-            loss.backward()
-            self.optimizer.step()
-
-            self.losses.append(loss.data)
+        if noTqdm:
+            for inputs, targets in self.dataloader:
+                self.trainOneLine(inputs, targets)
+        else:
+            for inputs, targets in tqdm(self.dataloader):
+                self.trainOneLine(inputs, targets)
 
         return sum(self.losses) / len(self.losses)
 
+    def trainOneLine(self, inputs, targets):
+        self.inputs, self.targets = inputs, targets
+        self.optimizer.zero_grad()
+        self.rnn.hidden = self.rnn.init_hidden()
+        self.sentence_out = self.rnn(inputs)
+        loss = self.criterion(self.sentence_out, self.targets)
+        loss.backward()
+        self.optimizer.step()
+        self.losses.append(loss.data)
+
     def run(self, epochs=10):
 
-        start = time.time()
+        with tqdm(total=epochs, unit='B', unit_scale=True) as pbar:
+            for i in range(self.i, epochs):
+                self.i = i
 
-        for i in range(self.i, epochs):
-            self.i = i
+                if epochs > 1:
+                    self.avg_loss = self.train(noTqdm=True)[0]
 
-            self.avg_loss = self.train()[0]
+                if i % self.print_every == 0:
+                    pbar.set_postfix(loss=self.avg_loss)
 
-            if i % self.print_every == 0:
-                print('%s (%d %d%%) %.4f' % (self.timeSince(start), i, i / epochs * 100, self.avg_loss))
-                
-            if i % self.plot_every == 0:
-                self.all_losses.append(self.avg_loss)
+                if i % self.plot_every == 0:
+                    self.all_losses.append(self.avg_loss)
+                pbar.update(i)
 
     @staticmethod
     def timeSince(since):
@@ -123,4 +129,4 @@ class DataLoaderTrainer():
         s = now - since
         m = math.floor(s / 60)
         s -= m * 60
-        return '%dm %ds' % (m, s)    
+        return '%dm %ds' % (m, s)
