@@ -63,6 +63,9 @@ class Word2VecModel() :
         self.unknown_token = np.load(output_filepath + '_unknown_token.npy')
         self.vocab = self.model.wv.vocab.keys()
 
+    def findSimilarWordByVector(self, vector):
+        return self.model.similar_by_vector(vector)
+
 if __name__ == '__main__':
     
     input_filename = '../preprocess/output/result.txt'

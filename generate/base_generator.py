@@ -8,6 +8,7 @@ import pickle
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
+import torch.nn.functional as F
 
 class LineGenerator():
 
@@ -113,6 +114,52 @@ class LineEmbeddingGenerator():
                 letter = self.dataloader.idx2word[topi]
                 output_name = output_name + ' ' + letter[0]
             input = Variable(self.dataloader.inputTensor(letter))
+
+        return output_name
+
+    # Get multiple samples from one category and multiple starting letters
+    def samples(self, start_letters='ABC'):
+        results = []
+        for start_letter in start_letters:
+            results.append(self.sample(start_letter))
+        return results
+
+
+
+class LineLstmEmbeddingGenerator():
+    def __init__(self, model, dataloader, embedding, vector_size, max_length=20):
+
+        self.rnn = model
+        self.dataloader = dataloader
+        self.embedding = embedding
+        self.max_length = max_length
+        self.vector_size = vector_size
+
+    # Sample from a category and starting letter
+    def sample(self, start_letter='A'):
+        for letter in start_letter:
+            start_word = random.choice([key for key in self.embedding.vocab if key[0] == letter])
+            print(self.generateLine(start_word))
+
+    def generateLine(self, seedWord):
+        inputWordVec = (self.embedding.model.wv[seedWord] if seedWord in self.embedding.vocab else self.unknown)
+
+        output_name = seedWord
+
+        self.rnn.hidden = self.rnn.init_hidden()
+        for i in range(self.max_length):
+            inputWordVec = torch.from_numpy(inputWordVec).view(-1, self.vector_size)
+            inputWordVec = inputWordVec.unsqueeze(0).unsqueeze(0)
+            inputWordVec = F.pad(inputWordVec, (0, 0, 0, 9)).squeeze(0)
+
+            out = self.rnn(inputWordVec)
+            out2Numpy = out[0][0].squeeze().data.numpy()
+            letter = self.embedding.findSimilarWordByVector(out2Numpy)
+            outputLetter = random.choice(letter)[0]
+            output_name = output_name + ' ' + outputLetter
+
+            inputWordVec = (
+                self.embedding.model.wv[outputLetter] if outputLetter in self.embedding.vocab else self.unknown)
 
         return output_name
 

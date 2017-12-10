@@ -84,10 +84,10 @@ class DataLoaderTrainer():
         self.plot_every = plot_every
         self.i = 0
         self.all_losses = []
+        self.losses = []
 
     def train(self, noTqdm=False):
 
-        self.losses = []
         if noTqdm:
             for inputs, targets in self.dataloader:
                 self.trainOneLine(inputs, targets)
@@ -109,7 +109,7 @@ class DataLoaderTrainer():
 
     def run(self, epochs=10):
 
-        with tqdm(total=epochs, unit='B', unit_scale=True) as pbar:
+        with tqdm(total=epochs, unit_scale=True) as pbar:
             for i in range(self.i, epochs):
                 self.i = i
 
@@ -121,7 +121,7 @@ class DataLoaderTrainer():
 
                 if i % self.plot_every == 0:
                     self.all_losses.append(self.avg_loss)
-                pbar.update(i)
+                pbar.update(1)
 
     @staticmethod
     def timeSince(since):
